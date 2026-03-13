@@ -1,0 +1,19 @@
+import 'package:flutter/material.dart';
+
+class DictionaryScreen extends StatelessWidget {
+  const DictionaryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+
+    return const Center(
+      child: Text(
+        "Diccionario de señas",
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
