@@ -1,7 +1,10 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import '../../../core/utils/mediapipe_channel.dart';
+import 'package:hand_landmarker/hand_landmarker.dart';
+
 import '../services/camera_service.dart';
+import '../services/hand_landmarker_service.dart';
+import '../widgets/hand_landmark_overlay.dart';
 
 class TranslateScreen extends StatefulWidget {
   const TranslateScreen({super.key});
@@ -11,400 +14,237 @@ class TranslateScreen extends StatefulWidget {
 }
 
 class _TranslateScreenState extends State<TranslateScreen> {
-  CameraController? controller;
-  bool isLoading = true;
-  bool isTestingNative = false;
-  bool isDetectingHand = false;
+  final HandLandmarkerService _handLandmarker = HandLandmarkerService();
 
-  String statusText = 'Iniciando cámara...';
-  String detectionText = 'MediaPipe aún no probado';
-  String translatedWord = 'Hola';
+  CameraController? _cameraController;
+  List<Hand> _hands = const [];
+  bool _isInitializing = true;
+  bool _isProcessingFrame = false;
+  bool _isDetectionPaused = false;
+  String? _errorMessage;
+  DateTime? _lastProcessedAt;
+
+  static const _minimumFrameInterval = Duration(milliseconds: 120);
 
   @override
   void initState() {
     super.initState();
-    startCamera();
+    _initialize();
   }
 
-  Future<void> startCamera() async {
+  Future<void> _initialize() async {
     try {
-      controller = await CameraService.initializeCamera();
+      final cameraController = await CameraService.initializeCamera();
+      await _handLandmarker.initialize();
 
-      if (!mounted) return;
+      if (!mounted) {
+        await cameraController.dispose();
+        await _handLandmarker.dispose();
+        return;
+      }
 
-      setState(() {
-        isLoading = false;
-        statusText = 'Apunta la cámara al lenguaje de señas';
-      });
-    } catch (e) {
-      if (!mounted) return;
+      _cameraController = cameraController;
+      await cameraController.startImageStream(_processCameraImage);
 
-      setState(() {
-        isLoading = false;
-        statusText = 'No se pudo iniciar la cámara';
-      });
-    }
-  }
-
-  Future<void> testAndroidChannel() async {
-    setState(() {
-      isTestingNative = true;
-      detectionText = 'Probando carga de MediaPipe...';
-    });
-
-    try {
-      final result = await MediaPipeChannel.loadMediaPipe();
-
-      if (!mounted) return;
-
-      setState(() {
-        detectionText = result;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result)),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        detectionText = 'Error al cargar MediaPipe: $e';
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al cargar MediaPipe: $e')),
-      );
-    } finally {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    } catch (error) {
       if (mounted) {
         setState(() {
-          isTestingNative = false;
+          _isInitializing = false;
+          _errorMessage = 'No se pudo iniciar la detección: $error';
         });
       }
     }
   }
 
-  Future<void> captureAndDetectHand() async {
-    if (controller == null || !controller!.value.isInitialized) return;
+  Future<void> _processCameraImage(CameraImage image) async {
+    if (_isProcessingFrame || _isDetectionPaused || !mounted) return;
 
-    setState(() {
-      isDetectingHand = true;
-      detectionText = 'Capturando imagen...';
-    });
+    final now = DateTime.now();
+    final lastProcessedAt = _lastProcessedAt;
+    if (lastProcessedAt != null &&
+        now.difference(lastProcessedAt) < _minimumFrameInterval) {
+      return;
+    }
+
+    _isProcessingFrame = true;
+    _lastProcessedAt = now;
 
     try {
-      final XFile image = await controller!.takePicture();
+      final controller = _cameraController;
+      if (controller == null) return;
 
-      if (!mounted) return;
-
-      setState(() {
-        detectionText = 'Analizando mano con MediaPipe...';
-      });
-
-      final result = await MediaPipeChannel.detectHandFromImage(image.path);
-
-      if (!mounted) return;
-
-      String newWord = translatedWord;
-
-      if (result.contains('Posible seña: Uno')) {
-        newWord = 'Uno';
-      } else if (result.contains('Posible seña: Dos')) {
-        newWord = 'Dos';
-      } else if (result.contains('Posible seña: Tres')) {
-        newWord = 'Tres';
-      } else if (result.contains('Posible seña: Cuatro')) {
-        newWord = 'Cuatro';
-      } else if (result.contains('Posible seña: Cinco')) {
-        newWord = 'Cinco';
-      } else if (result.contains('Posible seña: Puño')) {
-        newWord = 'Puño';
-      }
-
-      setState(() {
-        detectionText = result;
-        translatedWord = newWord;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result)),
+      final hands = _handLandmarker.detect(
+        image,
+        sensorOrientation: controller.description.sensorOrientation,
       );
-    } catch (e) {
-      if (!mounted) return;
 
-      setState(() {
-        detectionText = 'Error al detectar mano: $e';
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al detectar mano: $e')),
-      );
-    } finally {
       if (mounted) {
         setState(() {
-          isDetectingHand = false;
+          _hands = hands;
+          _errorMessage = null;
         });
       }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _errorMessage = 'Error al procesar la cámara: $error');
+      }
+    } finally {
+      _isProcessingFrame = false;
     }
+  }
+
+  void _toggleDetection() {
+    setState(() {
+      _isDetectionPaused = !_isDetectionPaused;
+      if (_isDetectionPaused) _hands = const [];
+    });
   }
 
   @override
   void dispose() {
+    final controller = _cameraController;
+    if (controller?.value.isStreamingImages ?? false) {
+      controller?.stopImageStream();
+    }
     controller?.dispose();
+    _handLandmarker.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
+    if (_isInitializing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) {
+      return _ErrorState(
+        message: _errorMessage ?? 'La cámara no está disponible.',
       );
     }
 
-    if (controller == null || !controller!.value.isInitialized) {
-      return Center(
-        child: Text(
-          statusText,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Card(
-            elevation: 6,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    statusText,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 420,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: Colors.black,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CameraPreview(controller!),
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.black.withOpacity(0.08),
-                          ),
-                        ),
-                        Center(
-                          child: Container(
-                            width: 250,
-                            height: 320,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 3,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 16,
-                          left: 16,
-                          right: 16,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.55),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text(
-                              'Coloca la mano dentro del recuadro',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: ColoredBox(
+                  color: Colors.black,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: isTestingNative ? null : testAndroidChannel,
-                          icon: isTestingNative
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.4,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.memory),
-                          label: Text(
-                            isTestingNative
-                                ? 'Cargando...'
-                                : 'Probar MediaPipe',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
+                      CameraPreview(controller),
+                      if (!_isDetectionPaused)
+                        HandLandmarkOverlay(
+                          hands: _hands,
+                          previewSize: controller.value.previewSize!,
+                          lensDirection: controller.description.lensDirection,
+                          sensorOrientation:
+                              controller.description.sensorOrientation,
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: isDetectingHand ? null : captureAndDetectHand,
-                          icon: isDetectingHand
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.4,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.pan_tool_alt),
-                          label: Text(
-                            isDetectingHand
-                                ? 'Analizando...'
-                                : 'Detectar mano',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        right: 12,
+                        child: _DetectionStatus(
+                          isPaused: _isDetectionPaused,
+                          handsCount: _hands.length,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.text_fields,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Traducción',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(24),
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFFFFE1E8),
-                              Color(0xFFDDFCF8),
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              translatedWord,
-                              style: const TextStyle(
-                                fontSize: 52,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFFFF6B6B),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Seña detectada',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black54,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              child: Text(
-                                detectionText,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            if (_errorMessage != null) ...[
+              Text(
+                _errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 10),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _toggleDetection,
+                icon: Icon(_isDetectionPaused ? Icons.play_arrow : Icons.pause),
+                label: Text(
+                  _isDetectionPaused
+                      ? 'Reanudar detección'
+                      : 'Pausar detección',
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Primer paso: seguimiento de manos en tiempo real. '
+              'El reconocimiento de señas se añadirá después.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetectionStatus extends StatelessWidget {
+  const _DetectionStatus({required this.isPaused, required this.handsCount});
+
+  final bool isPaused;
+  final int handsCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = isPaused
+        ? 'Detección pausada'
+        : handsCount == 0
+        ? 'Coloca una mano frente a la cámara'
+        : handsCount == 1
+        ? '1 mano detectada'
+        : '$handsCount manos detectadas';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(message, textAlign: TextAlign.center),
       ),
     );
   }
