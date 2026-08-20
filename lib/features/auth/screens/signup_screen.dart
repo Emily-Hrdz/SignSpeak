@@ -14,7 +14,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
@@ -56,10 +57,7 @@ class _SignupScreenState extends State<SignupScreen> {
         isLoading = true;
       });
 
-      await AuthService().signUp(
-        email: email,
-        password: password,
-      );
+      await AuthService().signUp(email: email, password: password);
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,9 +78,9 @@ class _SignupScreenState extends State<SignupScreen> {
       }
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (_) {
       if (context.mounted) {
@@ -102,9 +100,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Registrarse'),
-      ),
+      appBar: AppBar(title: const Text('Registrarse')),
       body: SafeArea(
         child: Container(
           width: double.infinity,
@@ -184,8 +180,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       child: ElevatedButton(
                         onPressed: isLoading ? null : register,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              isDark ? AppColors.darkPrimary : AppColors.primary,
+                          backgroundColor: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(

@@ -2,6 +2,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
 
+import '../../../core/widgets/gradient_background.dart';
 import '../services/camera_service.dart';
 import '../services/hand_landmarker_service.dart';
 import '../widgets/hand_landmark_overlay.dart';
@@ -131,34 +132,59 @@ class _TranslateScreenState extends State<TranslateScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'Traducción en vivo',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Coloca tus manos dentro de la cámara',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
             Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: ColoredBox(
-                  color: Colors.black,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CameraPreview(controller),
-                      if (!_isDetectionPaused)
-                        HandLandmarkOverlay(
-                          hands: _hands,
-                          previewSize: controller.value.previewSize!,
-                          lensDirection: controller.description.lensDirection,
-                          sensorOrientation:
-                              controller.description.sensorOrientation,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.shadow.withValues(alpha: 0.14),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(controller),
+                        if (!_isDetectionPaused)
+                          HandLandmarkOverlay(
+                            hands: _hands,
+                            previewSize: controller.value.previewSize!,
+                            lensDirection: controller.description.lensDirection,
+                            sensorOrientation:
+                                controller.description.sensorOrientation,
+                          ),
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          right: 12,
+                          child: _DetectionStatus(
+                            isPaused: _isDetectionPaused,
+                            handsCount: _hands.length,
+                          ),
                         ),
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        right: 12,
-                        child: _DetectionStatus(
-                          isPaused: _isDetectionPaused,
-                          handsCount: _hands.length,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -172,24 +198,36 @@ class _TranslateScreenState extends State<TranslateScreen> {
               ),
               const SizedBox(height: 10),
             ],
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _toggleDetection,
-                icon: Icon(_isDetectionPaused ? Icons.play_arrow : Icons.pause),
-                label: Text(
-                  _isDetectionPaused
-                      ? 'Reanudar detección'
-                      : 'Pausar detección',
-                ),
+            GlassSurface(
+              borderRadius: 20,
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _hands.isEmpty
+                          ? 'Esperando una seña…'
+                          : '${_hands.length} ${_hands.length == 1 ? 'mano localizada' : 'manos localizadas'}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: _toggleDetection,
+                    icon: Icon(
+                      _isDetectionPaused ? Icons.play_arrow : Icons.pause,
+                    ),
+                    label: Text(_isDetectionPaused ? 'Reanudar' : 'Pausar'),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Primer paso: seguimiento de manos en tiempo real. '
-              'El reconocimiento de señas se añadirá después.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 6),
+            Center(
+              child: Text(
+                'Seguimiento de manos activo · reconocimiento próximamente',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
           ],
         ),

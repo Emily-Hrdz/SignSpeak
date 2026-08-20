@@ -1,14 +1,21 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'app.dart';
 import 'firebase_options.dart';
+import 'features/settings/controllers/theme_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  runApp(const SignSpeakApp());
+  final themeController = await ThemeController.load();
+
+  runApp(
+    ChangeNotifierProvider.value(
+      value: themeController,
+      child: const SignSpeakApp(),
+    ),
+  );
 }

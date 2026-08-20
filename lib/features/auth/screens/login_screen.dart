@@ -39,10 +39,7 @@ class LoginScreen extends StatelessWidget {
                   isLoading = true;
                 });
 
-                await AuthService().signIn(
-                  email: email,
-                  password: password,
-                );
+                await AuthService().signIn(email: email, password: password);
 
                 if (context.mounted) {
                   Navigator.pop(dialogContext);
@@ -65,16 +62,14 @@ class LoginScreen extends StatelessWidget {
                 }
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(message)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
                 }
               } catch (_) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('No se pudo iniciar sesión.'),
-                    ),
+                    const SnackBar(content: Text('No se pudo iniciar sesión.')),
                   );
                 }
               } finally {
@@ -85,13 +80,16 @@ class LoginScreen extends StatelessWidget {
             }
 
             return Dialog(
-              backgroundColor:
-                  isDark ? AppColors.darkCard : AppColors.lightCard,
+              backgroundColor: isDark
+                  ? AppColors.darkCard
+                  : AppColors.lightCard,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
-              insetPadding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: SingleChildScrollView(
@@ -157,7 +155,10 @@ class LoginScreen extends StatelessWidget {
                               ? null
                               : () {
                                   Navigator.pop(dialogContext);
-                                  Navigator.pushNamed(context, '/forgot-password');
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/forgot-password',
+                                  );
                                 },
                           child: const Text('¿Olvidaste tu contraseña?'),
                         ),
@@ -246,10 +247,7 @@ class LoginScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    '👋',
-                    style: TextStyle(fontSize: 72),
-                  ),
+                  const Text('👋', style: TextStyle(fontSize: 72)),
                   const SizedBox(height: 12),
                   Text(
                     AppStrings.appName,
@@ -274,8 +272,9 @@ class LoginScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () => _showLoginDialog(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isDark ? AppColors.darkPrimary : AppColors.primary,
+                        backgroundColor: isDark
+                            ? AppColors.darkPrimary
+                            : AppColors.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -305,8 +304,9 @@ class LoginScreen extends StatelessWidget {
                               : AppColors.primary,
                           width: 2,
                         ),
-                        foregroundColor:
-                            isDark ? AppColors.darkPrimary : AppColors.primary,
+                        foregroundColor: isDark
+                            ? AppColors.darkPrimary
+                            : AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),

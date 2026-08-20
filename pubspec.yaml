@@ -37,6 +37,9 @@ dependencies:
   cloud_firestore: ^6.0.1
   camera: ^0.11.3
   hand_landmarker: ^2.2.0
+  video_player: ^2.10.1
+  provider: ^6.1.5
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -58,6 +61,7 @@ flutter:
 
   assets:
     - assets/models/
+    - assets/dictionary/videos/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

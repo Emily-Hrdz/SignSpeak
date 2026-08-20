@@ -54,9 +54,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       }
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (_) {
       if (context.mounted) {
@@ -76,9 +76,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recuperar Contraseña'),
-      ),
+      appBar: AppBar(title: const Text('Recuperar Contraseña')),
       body: SafeArea(
         child: Container(
           width: double.infinity,
@@ -113,8 +111,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       child: ElevatedButton(
                         onPressed: isLoading ? null : resetPassword,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              isDark ? AppColors.darkPrimary : AppColors.primary,
+                          backgroundColor: isDark
+                              ? AppColors.darkPrimary
+                              : AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(

@@ -6,12 +6,19 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:signspeak/app.dart';
+import 'package:signspeak/features/settings/controllers/theme_controller.dart';
 
 void main() {
   testWidgets('muestra la pantalla inicial de SignSpeak', (tester) async {
-    await tester.pumpWidget(const SignSpeakApp());
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => ThemeController(),
+        child: const SignSpeakApp(),
+      ),
+    );
 
     expect(find.text('SignSpeak'), findsOneWidget);
     expect(find.text('Iniciar Sesión'), findsOneWidget);
