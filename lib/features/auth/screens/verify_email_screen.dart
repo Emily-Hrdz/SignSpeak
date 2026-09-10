@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_brand_logo.dart';
 import '../../../core/widgets/clay_components.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../../../data/services/auth_service.dart';
@@ -126,19 +127,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.mark_email_unread_rounded,
-                          color: Colors.white,
-                          size: 34,
-                        ),
-                      ),
+                      const AppBrandLogo(size: 86),
                       const SizedBox(height: 24),
                       Text(
                         'Verifica tu correo',

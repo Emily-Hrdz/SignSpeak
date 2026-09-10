@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_brand_logo.dart';
 import '../../../core/widgets/clay_components.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../../../data/services/auth_service.dart';
@@ -107,24 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         alignment: WrapAlignment.center,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0xFF2563B8),
-                                  offset: Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.sign_language_rounded,
-                              color: Colors.white,
-                            ),
-                          ),
+                          const AppBrandLogo(size: 58),
                           const SizedBox(width: 12),
                           const Text(
                             'SignSpeak',

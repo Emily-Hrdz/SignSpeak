@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/widgets/app_brand_logo.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../../../data/services/auth_service.dart';
 import '../../settings/controllers/theme_controller.dart';
@@ -57,18 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         surfaceTintColor: Colors.transparent,
         title: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(13),
-                boxShadow: const [
-                  BoxShadow(color: Color(0xFF2563B8), offset: Offset(0, 4)),
-                ],
-              ),
-              child: const Icon(Icons.sign_language, color: Colors.white),
-            ),
+            const AppBrandLogo(size: 42),
             const SizedBox(width: 10),
             const Text(
               'SignSpeak',

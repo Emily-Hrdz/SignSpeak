@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 <uses-permission android:name="android.permission.CAMERA"/>
     <application
-        android:label="signspeak"
+        android:label="SignSpeak"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

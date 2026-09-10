@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/widgets/app_brand_logo.dart';
 import '../../../core/widgets/clay_components.dart';
 import '../../../data/services/auth_service.dart';
 
@@ -151,6 +153,8 @@ class _SignupScreenState extends State<SignupScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
+                  const AppBrandLogo(size: 76),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: nameController,
                     decoration: const InputDecoration(
