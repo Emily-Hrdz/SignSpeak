@@ -139,6 +139,60 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
     await _loadStats();
   }
 
+  Future<void> _deleteLastSample() async {
+    try {
+      final deletedLabel = await _dataset.deleteLastSample();
+      await _loadStats();
+      if (!mounted) return;
+      _showMessage(
+        deletedLabel == null || deletedLabel.isEmpty
+            ? 'No hay muestras para eliminar.'
+            : 'Se eliminó la última muestra ($deletedLabel).',
+      );
+    } catch (_) {
+      if (mounted) _showMessage('No se pudo eliminar la última muestra.');
+    }
+  }
+
+  Future<void> _confirmDeleteSelectedLabel() async {
+    final count = _stats.byLabel[_selectedLabel] ?? 0;
+    if (count == 0) {
+      _showMessage('No hay muestras de $_selectedLabel para eliminar.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Borrar muestras de $_selectedLabel'),
+        content: Text(
+          'Se eliminarán las $count muestras de $_selectedLabel. Las demás se conservarán.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Borrar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final removed = await _dataset.deleteSamplesForLabel(_selectedLabel);
+      await _loadStats();
+      if (mounted) {
+        _showMessage('Se eliminaron $removed muestras de $_selectedLabel.');
+      }
+    } catch (_) {
+      if (mounted) _showMessage('No se pudieron eliminar las muestras.');
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -269,6 +323,24 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
                   ],
                 ),
                 const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: _isCapturingSeries || _stats.total == 0
+                      ? null
+                      : _deleteLastSample,
+                  icon: const Icon(Icons.undo_rounded),
+                  label: const Text('Eliminar última muestra'),
+                ),
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed:
+                      _isCapturingSeries ||
+                          (_stats.byLabel[_selectedLabel] ?? 0) == 0
+                      ? null
+                      : _confirmDeleteSelectedLabel,
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: Text('Eliminar muestras de $_selectedLabel'),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(

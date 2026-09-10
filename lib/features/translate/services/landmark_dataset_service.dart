@@ -53,6 +53,21 @@ class LandmarkDatasetService {
 
   Future<void> clear() => _channel.invokeMethod<void>('clearDataset');
 
+  Future<String?> deleteLastSample() async {
+    final response = await _channel.invokeMapMethod<String, dynamic>(
+      'deleteLastDatasetSample',
+    );
+    return response?['label']?.toString();
+  }
+
+  Future<int> deleteSamplesForLabel(String label) async {
+    final response = await _channel.invokeMapMethod<String, dynamic>(
+      'deleteDatasetSamplesForLabel',
+      {'label': label.trim().toUpperCase()},
+    );
+    return (response?['removed'] as num?)?.toInt() ?? 0;
+  }
+
   Future<String> export() async {
     final path = await _channel.invokeMethod<String>('exportDataset');
     return path ?? 'Descargas/SignSpeak';

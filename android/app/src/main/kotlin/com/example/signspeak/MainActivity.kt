@@ -199,6 +199,54 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "deleteLastDatasetSample" -> {
+                    try {
+                        val datasetFile = getDatasetFile()
+                        val samples = readDatasetLines(datasetFile).toMutableList()
+                        if (samples.isEmpty()) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+
+                        val deletedLabel = JSONObject(samples.removeAt(samples.lastIndex))
+                            .optString("label")
+                        writeDatasetLines(datasetFile, samples)
+                        result.success(
+                            mapOf(
+                                "label" to deletedLabel,
+                                "total" to samples.size
+                            )
+                        )
+                    } catch (t: Throwable) {
+                        result.error("DATASET_ERROR", t.message, null)
+                    }
+                }
+
+                "deleteDatasetSamplesForLabel" -> {
+                    try {
+                        val label = call.argument<String>("label")?.trim().orEmpty()
+                        if (label.isEmpty()) {
+                            result.error("DATASET_ERROR", "La etiqueta es obligatoria", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val datasetFile = getDatasetFile()
+                        val samples = readDatasetLines(datasetFile)
+                        val remaining = samples.filter { line ->
+                            !JSONObject(line).optString("label").equals(label, ignoreCase = true)
+                        }
+                        writeDatasetLines(datasetFile, remaining)
+                        result.success(
+                            mapOf(
+                                "removed" to samples.size - remaining.size,
+                                "total" to remaining.size
+                            )
+                        )
+                    } catch (t: Throwable) {
+                        result.error("DATASET_ERROR", t.message, null)
+                    }
+                }
+
                 "exportDataset" -> {
                     try {
                         val datasetFile = getDatasetFile()
@@ -252,6 +300,29 @@ class MainActivity : FlutterActivity() {
     private fun countDatasetLines(file: File): Int {
         if (!file.exists()) return 0
         return file.useLines { lines -> lines.count { it.isNotBlank() } }
+    }
+
+    private fun readDatasetLines(file: File): List<String> {
+        if (!file.exists()) return emptyList()
+        return file.readLines().filter { it.isNotBlank() }
+    }
+
+    private fun writeDatasetLines(file: File, lines: List<String>) {
+        if (lines.isEmpty()) {
+            if (file.exists()) file.delete()
+            return
+        }
+
+        val temporaryFile = File(file.parentFile, "${file.name}.tmp")
+        temporaryFile.writeText(lines.joinToString(separator = "\n", postfix = "\n"))
+        if (file.exists() && !file.delete()) {
+            temporaryFile.delete()
+            throw IllegalStateException("No se pudo actualizar el conjunto de datos")
+        }
+        if (!temporaryFile.renameTo(file)) {
+            temporaryFile.copyTo(file, overwrite = true)
+            temporaryFile.delete()
+        }
     }
 
     private fun getHandLabel(handednessList: List<Category>): String {
