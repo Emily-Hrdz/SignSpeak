@@ -24,12 +24,24 @@ class AppTheme {
       ),
       cardColor: AppColors.lightCard,
       cardTheme: CardThemeData(
-        color: Colors.white.withValues(alpha: 0.72),
+        color: AppColors.lightCard,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.9)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF315FA8),
+        elevation: 0,
+        showCloseIcon: true,
+        closeIconColor: Colors.white,
+        actionTextColor: const Color(0xFFFFD666),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
         ),
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
@@ -47,7 +59,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.lightCard,
+        fillColor: const Color(0xFFEDF4FF),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
@@ -90,12 +102,24 @@ class AppTheme {
       ),
       cardColor: AppColors.darkCard,
       cardTheme: CardThemeData(
-        color: Colors.white.withValues(alpha: 0.09),
+        color: AppColors.darkCard,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF2C4F87),
+        elevation: 0,
+        showCloseIcon: true,
+        closeIconColor: Colors.white,
+        actionTextColor: const Color(0xFFFFD666),
+        contentTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
         ),
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
@@ -113,7 +137,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.darkCard,
+        fillColor: const Color(0xFF151E2E),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,

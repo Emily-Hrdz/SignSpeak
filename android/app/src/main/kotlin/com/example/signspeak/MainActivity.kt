@@ -2,6 +2,10 @@ package com.example.signspeak
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.content.ContentValues
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.components.containers.Category
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
@@ -13,6 +17,8 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : FlutterActivity() {
 
@@ -128,9 +134,124 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "appendDatasetSample" -> {
+                    try {
+                        val label = call.argument<String>("label")?.trim().orEmpty()
+                        val handSide = call.argument<String>("handSide")?.trim().orEmpty()
+                        val landmarks = call.argument<List<Double>>("landmarks")
+
+                        if (label.isEmpty() || landmarks == null || landmarks.size != 63) {
+                            result.error(
+                                "DATASET_ERROR",
+                                "La etiqueta y los 63 valores de la mano son obligatorios",
+                                null
+                            )
+                            return@setMethodCallHandler
+                        }
+
+                        val sample = JSONObject().apply {
+                            put("version", 1)
+                            put("label", label)
+                            put("handSide", handSide)
+                            put("capturedAt", System.currentTimeMillis())
+                            put("landmarks", JSONArray(landmarks))
+                        }
+                        val datasetFile = getDatasetFile()
+                        datasetFile.appendText(sample.toString() + "\n")
+                        result.success(countDatasetLines(datasetFile))
+                    } catch (t: Throwable) {
+                        result.error("DATASET_ERROR", t.message, null)
+                    }
+                }
+
+                "getDatasetStats" -> {
+                    try {
+                        val counts = linkedMapOf<String, Int>()
+                        val datasetFile = getDatasetFile()
+                        if (datasetFile.exists()) {
+                            datasetFile.forEachLine { line ->
+                                if (line.isNotBlank()) {
+                                    val label = JSONObject(line).optString("label")
+                                    if (label.isNotBlank()) {
+                                        counts[label] = (counts[label] ?: 0) + 1
+                                    }
+                                }
+                            }
+                        }
+                        result.success(
+                            mapOf(
+                                "total" to counts.values.sum(),
+                                "labels" to counts
+                            )
+                        )
+                    } catch (t: Throwable) {
+                        result.error("DATASET_ERROR", t.message, null)
+                    }
+                }
+
+                "clearDataset" -> {
+                    try {
+                        val datasetFile = getDatasetFile()
+                        if (datasetFile.exists()) datasetFile.delete()
+                        result.success(null)
+                    } catch (t: Throwable) {
+                        result.error("DATASET_ERROR", t.message, null)
+                    }
+                }
+
+                "exportDataset" -> {
+                    try {
+                        val datasetFile = getDatasetFile()
+                        if (!datasetFile.exists() || datasetFile.length() == 0L) {
+                            result.error("DATASET_EMPTY", "No hay muestras para exportar", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val exportName = "lensegua_landmarks_${System.currentTimeMillis()}.jsonl"
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            val values = ContentValues().apply {
+                                put(MediaStore.Downloads.DISPLAY_NAME, exportName)
+                                put(MediaStore.Downloads.MIME_TYPE, "application/json")
+                                put(
+                                    MediaStore.Downloads.RELATIVE_PATH,
+                                    "${Environment.DIRECTORY_DOWNLOADS}/SignSpeak"
+                                )
+                            }
+                            val uri = contentResolver.insert(
+                                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                                values
+                            ) ?: throw IllegalStateException("No se pudo crear el archivo")
+                            contentResolver.openOutputStream(uri)?.use { output ->
+                                datasetFile.inputStream().use { input -> input.copyTo(output) }
+                            } ?: throw IllegalStateException("No se pudo abrir el archivo")
+                            result.success("Descargas/SignSpeak/$exportName")
+                        } else {
+                            val exportDirectory = File(
+                                getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS),
+                                "SignSpeak"
+                            ).apply { mkdirs() }
+                            val exportedFile = File(exportDirectory, exportName)
+                            datasetFile.copyTo(exportedFile, overwrite = true)
+                            result.success(exportedFile.absolutePath)
+                        }
+                    } catch (t: Throwable) {
+                        result.error("DATASET_ERROR", t.message, null)
+                    }
+                }
+
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun getDatasetFile(): File {
+        val directory = File(filesDir, "datasets").apply { mkdirs() }
+        return File(directory, "lensegua_landmarks.jsonl")
+    }
+
+    private fun countDatasetLines(file: File): Int {
+        if (!file.exists()) return 0
+        return file.useLines { lines -> lines.count { it.isNotBlank() } }
     }
 
     private fun getHandLabel(handednessList: List<Category>): String {

@@ -33,7 +33,7 @@ IconData iconForCategory(SignCategory category) => switch (category) {
 };
 
 Color colorForCategory(SignCategory category) => switch (category) {
-  SignCategory.alphabet => const Color(0xFF4285F4),
-  SignCategory.numbers => const Color(0xFF5B78D4),
-  SignCategory.phrases => const Color(0xFF8B5CF6),
+  SignCategory.alphabet => const Color(0xFFFFC94D),
+  SignCategory.numbers => const Color(0xFFFF8C4A),
+  SignCategory.phrases => const Color(0xFF9B82F3),
 };

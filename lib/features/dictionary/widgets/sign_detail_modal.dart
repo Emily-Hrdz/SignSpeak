@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../core/widgets/gradient_background.dart';
+import '../../../core/widgets/clay_components.dart';
 import '../../../data/models/sign_model.dart';
 import 'category_chip.dart';
 
@@ -140,23 +141,20 @@ class _SignDetailScreenState extends State<SignDetailScreen> {
               const SizedBox(height: 8),
               Text(sign.instructions),
               const SizedBox(height: 18),
-              Card(
-                elevation: 0,
-                color: color.withValues(alpha: 0.1),
-                child: const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.tips_and_updates_outlined),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Toca el video para pausarlo o reproducirlo. La demostración se repite automáticamente.',
-                        ),
+              ClaySurface(
+                borderRadius: 18,
+                padding: const EdgeInsets.all(14),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.tips_and_updates_outlined),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Toca el video para pausarlo o reproducirlo. La demostración se repite automáticamente.',
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 class GradientBackground extends StatelessWidget {
@@ -10,16 +8,8 @@ class GradientBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF111A2A), Color(0xFF21172D)]
-              : const [Color(0xFFEEF5FF), Color(0xFFF8F2FF)],
-        ),
-      ),
+    return ColoredBox(
+      color: isDark ? const Color(0xFF121A2A) : const Color(0xFFEEF4FF),
       child: child,
     );
   }
@@ -40,22 +30,27 @@ class GlassSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: isDark ? 0.1 : 0.76),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: isDark ? 0.16 : 0.88),
-            ),
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF202B40) : const Color(0xFFF8FBFF),
+        borderRadius: BorderRadius.circular(borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.95),
+            offset: const Offset(-4, -4),
+            blurRadius: 8,
           ),
-          child: child,
-        ),
+          BoxShadow(
+            color: isDark ? const Color(0xFF080D17) : const Color(0xFFC5D5EA),
+            offset: const Offset(0, 6),
+            blurRadius: 0,
+          ),
+        ],
       ),
+      child: child,
     );
   }
 }

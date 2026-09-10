@@ -5,7 +5,10 @@ import 'package:hand_landmarker/hand_landmarker.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../services/camera_service.dart';
 import '../services/hand_landmarker_service.dart';
+import '../services/landmark_classifier_service.dart';
+import '../services/speech_service.dart';
 import '../widgets/hand_landmark_overlay.dart';
+import '../widgets/dataset_capture_sheet.dart';
 
 class TranslateScreen extends StatefulWidget {
   const TranslateScreen({super.key});
@@ -16,6 +19,10 @@ class TranslateScreen extends StatefulWidget {
 
 class _TranslateScreenState extends State<TranslateScreen> {
   final HandLandmarkerService _handLandmarker = HandLandmarkerService();
+  final LandmarkClassifierService _classifier = LandmarkClassifierService();
+  final SpeechService _speech = SpeechService();
+  final TextEditingController _translationController = TextEditingController();
+  final FocusNode _translationFocusNode = FocusNode();
 
   CameraController? _cameraController;
   List<Hand> _hands = const [];
@@ -24,6 +31,14 @@ class _TranslateScreenState extends State<TranslateScreen> {
   bool _isDetectionPaused = false;
   String? _errorMessage;
   DateTime? _lastProcessedAt;
+  final List<LandmarkPrediction> _predictionHistory = [];
+  String? _stablePrediction;
+  double _stableConfidence = 0;
+  String? _lastCommittedPrediction;
+  DateTime? _lastHandSeenAt;
+  bool _isSpeaking = false;
+  bool _isEditingTranslation = false;
+  bool _resumeDetectionAfterEditing = false;
 
   static const _minimumFrameInterval = Duration(milliseconds: 120);
 
@@ -37,6 +52,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
     try {
       final cameraController = await CameraService.initializeCamera();
       await _handLandmarker.initialize();
+      await _classifier.initialize();
 
       if (!mounted) {
         await cameraController.dispose();
@@ -57,6 +73,145 @@ class _TranslateScreenState extends State<TranslateScreen> {
           _errorMessage = 'No se pudo iniciar la detección: $error';
         });
       }
+    }
+  }
+
+  void _updatePrediction(List<Hand> hands) {
+    if (hands.length != 1 || hands.first.landmarks.length < 21) {
+      final lastHandSeenAt = _lastHandSeenAt;
+      if (lastHandSeenAt != null &&
+          DateTime.now().difference(lastHandSeenAt) >
+              const Duration(milliseconds: 700)) {
+        _lastCommittedPrediction = null;
+      }
+      _predictionHistory.clear();
+      _stablePrediction = null;
+      _stableConfidence = 0;
+      return;
+    }
+
+    _lastHandSeenAt = DateTime.now();
+
+    final prediction = _classifier.predict(hands.first.landmarks);
+    if (prediction == null || prediction.confidence < 0.60) {
+      if (_predictionHistory.isNotEmpty) _predictionHistory.removeAt(0);
+      _stablePrediction = null;
+      _stableConfidence = 0;
+      return;
+    }
+
+    _predictionHistory.add(prediction);
+    if (_predictionHistory.length > 7) _predictionHistory.removeAt(0);
+
+    final counts = <String, int>{};
+    for (final item in _predictionHistory) {
+      counts[item.label] = (counts[item.label] ?? 0) + 1;
+    }
+    final winner = counts.entries.reduce(
+      (first, second) => first.value >= second.value ? first : second,
+    );
+    final winnerPredictions = _predictionHistory
+        .where((item) => item.label == winner.key)
+        .toList();
+    final averageConfidence =
+        winnerPredictions.fold<double>(
+          0,
+          (sum, item) => sum + item.confidence,
+        ) /
+        winnerPredictions.length;
+
+    if (winner.value >= 5 && averageConfidence >= 0.72) {
+      _stablePrediction = winner.key;
+      _stableConfidence = averageConfidence;
+      _commitPrediction(winner.key);
+    } else {
+      _stablePrediction = null;
+      _stableConfidence = 0;
+    }
+  }
+
+  void _commitPrediction(String label) {
+    if (_lastCommittedPrediction == label) return;
+    final updatedText = '${_translationController.text}$label';
+    _translationController
+      ..text = updatedText
+      ..selection = TextSelection.collapsed(offset: updatedText.length);
+    _lastCommittedPrediction = label;
+  }
+
+  void _addSpace() {
+    final text = _translationController.text.trimRight();
+    _translationController
+      ..text = text.isEmpty ? '' : '$text '
+      ..selection = TextSelection.collapsed(
+        offset: text.isEmpty ? 0 : text.length + 1,
+      );
+    setState(() {});
+  }
+
+  void _removeLastCharacter() {
+    final text = _translationController.text;
+    if (text.isEmpty) return;
+    final updatedText = text.substring(0, text.length - 1);
+    _translationController
+      ..text = updatedText
+      ..selection = TextSelection.collapsed(offset: updatedText.length);
+    setState(() {});
+  }
+
+  void _clearTranslation() {
+    _translationController.clear();
+    _lastCommittedPrediction = null;
+    setState(() {});
+  }
+
+  Future<void> _speakTranslation() async {
+    if (_translationController.text.trim().isEmpty || _isSpeaking) return;
+    setState(() => _isSpeaking = true);
+    try {
+      await _speech.speak(_translationController.text);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo reproducir la voz en este dispositivo.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSpeaking = false);
+    }
+  }
+
+  void _startTextEditing() {
+    setState(() {
+      _resumeDetectionAfterEditing = !_isDetectionPaused;
+      _isEditingTranslation = true;
+      _isDetectionPaused = true;
+      _hands = const [];
+      _predictionHistory.clear();
+      _stablePrediction = null;
+      _stableConfidence = 0;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _translationFocusNode.requestFocus();
+    });
+  }
+
+  void _finishTextEditing() {
+    _translationFocusNode.unfocus();
+    setState(() {
+      _isEditingTranslation = false;
+      if (_resumeDetectionAfterEditing) _isDetectionPaused = false;
+      _resumeDetectionAfterEditing = false;
+    });
+  }
+
+  void _toggleTextEditing() {
+    if (_isEditingTranslation) {
+      _finishTextEditing();
+    } else {
+      _startTextEditing();
     }
   }
 
@@ -82,7 +237,8 @@ class _TranslateScreenState extends State<TranslateScreen> {
         sensorOrientation: controller.description.sensorOrientation,
       );
 
-      if (mounted) {
+      if (mounted && !_isDetectionPaused) {
+        _updatePrediction(hands);
         setState(() {
           _hands = hands;
           _errorMessage = null;
@@ -101,7 +257,25 @@ class _TranslateScreenState extends State<TranslateScreen> {
     setState(() {
       _isDetectionPaused = !_isDetectionPaused;
       if (_isDetectionPaused) _hands = const [];
+      if (_isDetectionPaused) {
+        _predictionHistory.clear();
+        _stablePrediction = null;
+        _stableConfidence = 0;
+      }
     });
+  }
+
+  Future<void> _openDatasetCapture() async {
+    if (_isDetectionPaused) {
+      setState(() => _isDetectionPaused = false);
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DatasetCaptureSheet(handsProvider: () => _hands),
+    );
   }
 
   @override
@@ -112,6 +286,9 @@ class _TranslateScreenState extends State<TranslateScreen> {
     }
     controller?.dispose();
     _handLandmarker.dispose();
+    _speech.stop();
+    _translationController.dispose();
+    _translationFocusNode.dispose();
     super.dispose();
   }
 
@@ -129,8 +306,8 @@ class _TranslateScreenState extends State<TranslateScreen> {
     }
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -144,17 +321,17 @@ class _TranslateScreenState extends State<TranslateScreen> {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 14),
-            Expanded(
+            AspectRatio(
+              aspectRatio: 0.72,
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.shadow.withValues(alpha: 0.14),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? const Color(0xFF080D17)
+                          : const Color(0xFFC5D5EA),
+                      offset: const Offset(0, 7),
                     ),
                   ],
                 ),
@@ -183,6 +360,16 @@ class _TranslateScreenState extends State<TranslateScreen> {
                             handsCount: _hands.length,
                           ),
                         ),
+                        if (_stablePrediction != null)
+                          Positioned(
+                            bottom: 14,
+                            left: 14,
+                            right: 14,
+                            child: _RecognitionResult(
+                              label: _stablePrediction!,
+                              confidence: _stableConfidence,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -201,32 +388,155 @@ class _TranslateScreenState extends State<TranslateScreen> {
             GlassSurface(
               borderRadius: 20,
               padding: const EdgeInsets.all(12),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(
-                      _hands.isEmpty
-                          ? 'Esperando una seña…'
-                          : '${_hands.length} ${_hands.length == 1 ? 'mano localizada' : 'manos localizadas'}',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Texto traducido',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      IconButton.filled(
+                        tooltip: 'Reproducir texto',
+                        onPressed:
+                            _translationController.text.trim().isEmpty ||
+                                _isSpeaking
+                            ? null
+                            : _speakTranslation,
+                        icon: _isSpeaking
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.volume_up_rounded),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: _isDetectionPaused ? 'Reanudar' : 'Pausar',
+                        onPressed: _isEditingTranslation
+                            ? null
+                            : _toggleDetection,
+                        icon: Icon(
+                          _isDetectionPaused ? Icons.play_arrow : Icons.pause,
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextField(
+                    controller: _translationController,
+                    focusNode: _translationFocusNode,
+                    readOnly: !_isEditingTranslation,
+                    showCursor: _isEditingTranslation,
+                    minLines: 1,
+                    maxLines: 2,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Las letras reconocidas aparecerán aquí',
+                      helperText: _isEditingTranslation
+                          ? 'Corrige el mensaje y pulsa Listo.'
+                          : 'Toca el lápiz para editar manualmente.',
+                      suffixIcon: IconButton(
+                        tooltip: _isEditingTranslation
+                            ? 'Finalizar edición'
+                            : 'Editar texto',
+                        onPressed: _toggleTextEditing,
+                        icon: Icon(
+                          _isEditingTranslation
+                              ? Icons.check_circle_rounded
+                              : Icons.edit_rounded,
+                        ),
+                      ),
                     ),
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: _toggleDetection,
-                    icon: Icon(
-                      _isDetectionPaused ? Icons.play_arrow : Icons.pause,
-                    ),
-                    label: Text(_isDetectionPaused ? 'Reanudar' : 'Pausar'),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Borrar último carácter',
+                        onPressed: _translationController.text.isEmpty
+                            ? null
+                            : _removeLastCharacter,
+                        icon: const Icon(Icons.backspace_outlined),
+                      ),
+                      TextButton.icon(
+                        onPressed: _translationController.text.trim().isEmpty
+                            ? null
+                            : _addSpace,
+                        icon: const Icon(Icons.space_bar_rounded),
+                        label: const Text('Espacio'),
+                      ),
+                      IconButton(
+                        tooltip: 'Limpiar texto',
+                        onPressed: _translationController.text.isEmpty
+                            ? null
+                            : _clearTranslation,
+                        icon: const Icon(Icons.delete_sweep_outlined),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
-            Center(
-              child: Text(
-                'Seguimiento de manos activo · reconocimiento próximamente',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isEditingTranslation ? null : _openDatasetCapture,
+                icon: const Icon(Icons.dataset_outlined),
+                label: const Text('Crear muestras'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecognitionResult extends StatelessWidget {
+  const _RecognitionResult({required this.label, required this.confidence});
+
+  final String label;
+  final double confidence;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF2563B8), offset: Offset(0, 5)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.translate_rounded, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 25,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              '${(confidence * 100).round()}%',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

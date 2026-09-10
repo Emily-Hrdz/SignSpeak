@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../../../data/services/auth_service.dart';
 import '../../settings/controllers/theme_controller.dart';
 import '../../translate/screens/translate_screen.dart';
 import '../../dictionary/screens/dictionary_screen.dart';
+import '../widgets/app_tutorial_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,14 +21,39 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> screens = const [TranslateScreen(), DictionaryScreen()];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _showFirstUseTutorial(),
+    );
+  }
+
+  Future<void> _showFirstUseTutorial() async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+    final preferences = await SharedPreferences.getInstance();
+    final preferenceKey = 'tutorial_seen_$userId';
+    if (preferences.getBool(preferenceKey) == true || !mounted) return;
+
+    await _showTutorial();
+    await preferences.setBool(preferenceKey, true);
+  }
+
+  Future<void> _showTutorial() async {
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AppTutorialDialog(),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.surface.withValues(
-          alpha: Theme.of(context).brightness == Brightness.dark ? 0.92 : 0.88,
-        ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         surfaceTintColor: Colors.transparent,
         title: Row(
           children: [
@@ -34,12 +61,11 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4285F4), Color(0xFF8B5CF6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Theme.of(context).colorScheme.primary,
                 borderRadius: BorderRadius.circular(13),
+                boxShadow: const [
+                  BoxShadow(color: Color(0xFF2563B8), offset: Offset(0, 4)),
+                ],
               ),
               child: const Icon(Icons.sign_language, color: Colors.white),
             ),
@@ -51,6 +77,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Ver tutorial',
+            onPressed: _showTutorial,
+            icon: const Icon(Icons.help_outline_rounded),
+          ),
           Consumer<ThemeController>(
             builder: (context, themeController, _) => IconButton(
               tooltip: themeController.isDarkMode

@@ -21,7 +21,8 @@ void main() {
     );
 
     expect(find.text('SignSpeak'), findsOneWidget);
-    expect(find.text('Iniciar Sesión'), findsOneWidget);
-    expect(find.text('Entrar como Invitado'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
+    expect(find.text('Entrar a SignSpeak'), findsOneWidget);
+    expect(find.text('Entrar como invitado'), findsNothing);
   });
 }
