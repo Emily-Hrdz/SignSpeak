@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
 
+import 'face_landmark_service.dart';
+
 class DatasetStats {
   const DatasetStats({required this.total, required this.byLabel});
 
@@ -17,6 +19,7 @@ class LandmarkDatasetService {
     required String label,
     required String handSide,
     required List<Landmark> landmarks,
+    FaceReference? faceReference,
   }) async {
     if (landmarks.length < 21) {
       throw ArgumentError('Se requieren los 21 puntos de la mano.');
@@ -30,6 +33,15 @@ class LandmarkDatasetService {
       'label': label.trim().toUpperCase(),
       'handSide': handSide,
       'landmarks': normalized,
+      if (faceReference != null) ...{
+        'face': faceReference.toJson(),
+        'imageLandmarks': [
+          for (final landmark in landmarks.take(21)) ...[
+            landmark.x,
+            landmark.y,
+          ],
+        ],
+      },
     });
     return count ?? 0;
   }

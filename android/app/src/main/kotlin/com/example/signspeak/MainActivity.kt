@@ -139,6 +139,8 @@ class MainActivity : FlutterActivity() {
                         val label = call.argument<String>("label")?.trim().orEmpty()
                         val handSide = call.argument<String>("handSide")?.trim().orEmpty()
                         val landmarks = call.argument<List<Double>>("landmarks")
+                        val face = call.argument<Map<String, Any?>>("face")
+                        val imageLandmarks = call.argument<List<Double>>("imageLandmarks")
 
                         if (label.isEmpty() || landmarks == null || landmarks.size != 63) {
                             result.error(
@@ -150,11 +152,15 @@ class MainActivity : FlutterActivity() {
                         }
 
                         val sample = JSONObject().apply {
-                            put("version", 1)
+                            put("version", if (face == null) 1 else 2)
                             put("label", label)
                             put("handSide", handSide)
                             put("capturedAt", System.currentTimeMillis())
                             put("landmarks", JSONArray(landmarks))
+                            if (face != null && imageLandmarks != null) {
+                                put("face", JSONObject(face))
+                                put("imageLandmarks", JSONArray(imageLandmarks))
+                            }
                         }
                         val datasetFile = getDatasetFile()
                         datasetFile.appendText(sample.toString() + "\n")

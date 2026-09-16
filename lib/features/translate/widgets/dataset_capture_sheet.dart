@@ -1,20 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
 
 import '../../../core/widgets/clay_components.dart';
 import '../services/landmark_dataset_service.dart';
+import '../services/face_landmark_service.dart';
 
 class DatasetCaptureSheet extends StatefulWidget {
-  const DatasetCaptureSheet({required this.handsProvider, super.key});
+  const DatasetCaptureSheet({
+    required this.handsProvider,
+    required this.faceProvider,
+    super.key,
+  });
 
   final List<Hand> Function() handsProvider;
+  final FaceReference? Function() faceProvider;
 
   @override
   State<DatasetCaptureSheet> createState() => _DatasetCaptureSheetState();
 }
 
 class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
-  static const _labels = ['A', 'B', 'C', 'D', 'E'];
+  static const _labels = ['A', 'B', 'C', 'D', 'E', 'G', 'H', 'I'];
+  static const _spatialLabels = {'G', 'H', 'I'};
   static const _targetPerSeries = 30;
 
   final _dataset = LandmarkDatasetService();
@@ -24,16 +33,21 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
   bool _isLoading = true;
   bool _isCapturingSeries = false;
   int _seriesProgress = 0;
+  Timer? _faceStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+    _faceStatusTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (mounted && _spatialLabels.contains(_selectedLabel)) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _isCapturingSeries = false;
+    _faceStatusTimer?.cancel();
     super.dispose();
   }
 
@@ -56,12 +70,21 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
       }
       return false;
     }
+    final needsFace = _spatialLabels.contains(_selectedLabel);
+    final faceReference = widget.faceProvider();
+    if (needsFace && (faceReference == null || !faceReference.isFresh)) {
+      if (showFeedback) {
+        _showMessage('Mantén el rostro completo visible junto con la mano.');
+      }
+      return false;
+    }
 
     try {
       await _dataset.saveSample(
         label: _selectedLabel,
         handSide: _handSide,
         landmarks: hands.first.landmarks,
+        faceReference: needsFace ? faceReference : null,
       );
       await _loadStats();
       if (showFeedback && mounted) _showMessage('Muestra guardada.');
@@ -233,7 +256,7 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
                   ],
                 ),
                 const Text(
-                  'Realiza la seña y mueve ligeramente la mano entre muestras. Usa una sola mano y buena iluminación.',
+                  'A–E usan la forma de la mano. G, H e I también guardan la posición respecto al rostro. Usa una sola mano y buena iluminación.',
                 ),
                 const SizedBox(height: 18),
                 Row(
@@ -277,6 +300,46 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
                     ),
                   ],
                 ),
+                if (_spatialLabels.contains(_selectedLabel)) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _selectedLabel == 'G'
+                        ? 'Coloca la mano en la posición final junto a la oreja.'
+                        : _selectedLabel == 'H'
+                        ? 'Mantén los dos dedos frente a los labios.'
+                        : 'Mantén el dedo debajo del ojo.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (context) {
+                      final faceDetected =
+                          widget.faceProvider()?.isFresh == true;
+                      return Row(
+                        children: [
+                          Icon(
+                            faceDetected
+                                ? Icons.face_retouching_natural_rounded
+                                : Icons.face_retouching_off_rounded,
+                            color: faceDetected
+                                ? const Color(0xFF2E9D67)
+                                : Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            faceDetected
+                                ? 'Rostro detectado'
+                                : 'Buscando rostro completo…',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
                 const SizedBox(height: 16),
                 ClayButton(
                   label: _isCapturingSeries

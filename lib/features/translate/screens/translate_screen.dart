@@ -4,6 +4,7 @@ import 'package:hand_landmarker/hand_landmarker.dart';
 
 import '../../../core/widgets/gradient_background.dart';
 import '../services/camera_service.dart';
+import '../services/face_landmark_service.dart';
 import '../services/hand_landmarker_service.dart';
 import '../services/landmark_classifier_service.dart';
 import '../services/speech_service.dart';
@@ -19,6 +20,7 @@ class TranslateScreen extends StatefulWidget {
 
 class _TranslateScreenState extends State<TranslateScreen> {
   final HandLandmarkerService _handLandmarker = HandLandmarkerService();
+  final FaceLandmarkService _faceLandmarker = FaceLandmarkService();
   final LandmarkClassifierService _classifier = LandmarkClassifierService();
   final SpeechService _speech = SpeechService();
   final TextEditingController _translationController = TextEditingController();
@@ -26,11 +28,13 @@ class _TranslateScreenState extends State<TranslateScreen> {
 
   CameraController? _cameraController;
   List<Hand> _hands = const [];
+  FaceReference? _faceReference;
   bool _isInitializing = true;
   bool _isProcessingFrame = false;
   bool _isDetectionPaused = false;
   String? _errorMessage;
   DateTime? _lastProcessedAt;
+  int _processedFrameCount = 0;
   final List<LandmarkPrediction> _predictionHistory = [];
   String? _stablePrediction;
   double _stableConfidence = 0;
@@ -236,11 +240,24 @@ class _TranslateScreenState extends State<TranslateScreen> {
         image,
         sensorOrientation: controller.description.sensorOrientation,
       );
+      FaceReference? faceReference = _faceReference;
+      _processedFrameCount++;
+      if (_processedFrameCount.isEven) {
+        try {
+          faceReference = await _faceLandmarker.detect(
+            image,
+            sensorOrientation: controller.description.sensorOrientation,
+          );
+        } catch (_) {
+          faceReference = null;
+        }
+      }
 
       if (mounted && !_isDetectionPaused) {
         _updatePrediction(hands);
         setState(() {
           _hands = hands;
+          _faceReference = faceReference;
           _errorMessage = null;
         });
       }
@@ -258,6 +275,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
       _isDetectionPaused = !_isDetectionPaused;
       if (_isDetectionPaused) _hands = const [];
       if (_isDetectionPaused) {
+        _faceReference = null;
         _predictionHistory.clear();
         _stablePrediction = null;
         _stableConfidence = 0;
@@ -274,7 +292,10 @@ class _TranslateScreenState extends State<TranslateScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => DatasetCaptureSheet(handsProvider: () => _hands),
+      builder: (_) => DatasetCaptureSheet(
+        handsProvider: () => _hands,
+        faceProvider: () => _faceReference,
+      ),
     );
   }
 
@@ -286,6 +307,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
     }
     controller?.dispose();
     _handLandmarker.dispose();
+    _faceLandmarker.dispose();
     _speech.stop();
     _translationController.dispose();
     _translationFocusNode.dispose();
