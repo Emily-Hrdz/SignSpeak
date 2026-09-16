@@ -14,12 +14,28 @@ void main() {
     expect(classifier.isInitialized, isTrue);
     expect(
       prediction.label,
-      isIn(const ['A', 'B', 'C', 'D', 'E', 'L', 'M', 'N', 'O']),
+      isIn(const [
+        'A',
+        'B',
+        'C',
+        'D',
+        'E',
+        'L',
+        'M',
+        'N',
+        'O',
+        'P',
+        'R',
+        'U',
+        'V',
+        'W',
+        'Y',
+      ]),
     );
     expect(prediction.confidence, inInclusiveRange(0, 1));
   });
 
-  test('carga el modelo espacial G, H, I y K', () async {
+  test('carga el modelo espacial G, H, I, K y T', () async {
     final classifier = SpatialLandmarkClassifierService();
 
     await classifier.initialize();

@@ -39,6 +39,8 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
     'P',
     'R',
     'T',
+    'U',
+    'V',
     'W',
     'Y',
   ];
