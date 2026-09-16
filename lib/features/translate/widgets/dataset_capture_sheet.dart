@@ -22,8 +22,34 @@ class DatasetCaptureSheet extends StatefulWidget {
 }
 
 class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
-  static const _labels = ['A', 'B', 'C', 'D', 'E', 'G', 'H', 'I'];
-  static const _spatialLabels = {'G', 'H', 'I'};
+  static const _labels = [
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'G',
+    'H',
+    'I',
+    'K',
+    'L',
+    'M',
+    'N',
+    'O',
+    'P',
+    'R',
+    'T',
+    'W',
+    'Y',
+  ];
+  static const _spatialLabels = {'G', 'H', 'I', 'K', 'T'};
+  static const _spatialGuidance = {
+    'G': 'Coloca la mano en la posición final junto a la oreja.',
+    'H': 'Mantén los dos dedos frente a los labios.',
+    'I': 'Mantén el dedo debajo del ojo.',
+    'K': 'Mantén los dos dedos en su posición final frente al rostro.',
+    'T': 'Mantén los dos dedos en posición horizontal frente a los ojos.',
+  };
   static const _targetPerSeries = 30;
 
   final _dataset = LandmarkDatasetService();
@@ -256,7 +282,7 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
                   ],
                 ),
                 const Text(
-                  'A–E usan la forma de la mano. G, H e I también guardan la posición respecto al rostro. Usa una sola mano y buena iluminación.',
+                  'Las señas estáticas guardan la forma de la mano; G, H, I, K y T también guardan su posición respecto al rostro. Las letras con movimiento o dos manos se agregarán después. Usa una sola mano y buena iluminación.',
                 ),
                 const SizedBox(height: 18),
                 Row(
@@ -303,11 +329,8 @@ class _DatasetCaptureSheetState extends State<DatasetCaptureSheet> {
                 if (_spatialLabels.contains(_selectedLabel)) ...[
                   const SizedBox(height: 12),
                   Text(
-                    _selectedLabel == 'G'
-                        ? 'Coloca la mano en la posición final junto a la oreja.'
-                        : _selectedLabel == 'H'
-                        ? 'Mantén los dos dedos frente a los labios.'
-                        : 'Mantén el dedo debajo del ojo.',
+                    _spatialGuidance[_selectedLabel] ??
+                        'Mantén la mano en su posición final frente al rostro.',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w800,

@@ -7,6 +7,7 @@ import '../services/camera_service.dart';
 import '../services/face_landmark_service.dart';
 import '../services/hand_landmarker_service.dart';
 import '../services/landmark_classifier_service.dart';
+import '../services/spatial_landmark_classifier_service.dart';
 import '../services/speech_service.dart';
 import '../widgets/hand_landmark_overlay.dart';
 import '../widgets/dataset_capture_sheet.dart';
@@ -22,6 +23,8 @@ class _TranslateScreenState extends State<TranslateScreen> {
   final HandLandmarkerService _handLandmarker = HandLandmarkerService();
   final FaceLandmarkService _faceLandmarker = FaceLandmarkService();
   final LandmarkClassifierService _classifier = LandmarkClassifierService();
+  final SpatialLandmarkClassifierService _spatialClassifier =
+      SpatialLandmarkClassifierService();
   final SpeechService _speech = SpeechService();
   final TextEditingController _translationController = TextEditingController();
   final FocusNode _translationFocusNode = FocusNode();
@@ -57,6 +60,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
       final cameraController = await CameraService.initializeCamera();
       await _handLandmarker.initialize();
       await _classifier.initialize();
+      await _spatialClassifier.initialize();
 
       if (!mounted) {
         await cameraController.dispose();
@@ -80,7 +84,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
     }
   }
 
-  void _updatePrediction(List<Hand> hands) {
+  void _updatePrediction(List<Hand> hands, FaceReference? faceReference) {
     if (hands.length != 1 || hands.first.landmarks.length < 21) {
       final lastHandSeenAt = _lastHandSeenAt;
       if (lastHandSeenAt != null &&
@@ -96,7 +100,15 @@ class _TranslateScreenState extends State<TranslateScreen> {
 
     _lastHandSeenAt = DateTime.now();
 
-    final prediction = _classifier.predict(hands.first.landmarks);
+    final spatialPrediction = _spatialClassifier.predict(
+      hands.first.landmarks,
+      faceReference,
+    );
+    final prediction =
+        spatialPrediction?.confidence.isFinite == true &&
+            spatialPrediction!.confidence >= 0.72
+        ? spatialPrediction
+        : _classifier.predict(hands.first.landmarks);
     if (prediction == null || prediction.confidence < 0.60) {
       if (_predictionHistory.isNotEmpty) _predictionHistory.removeAt(0);
       _stablePrediction = null;
@@ -254,7 +266,7 @@ class _TranslateScreenState extends State<TranslateScreen> {
       }
 
       if (mounted && !_isDetectionPaused) {
-        _updatePrediction(hands);
+        _updatePrediction(hands, faceReference);
         setState(() {
           _hands = hands;
           _faceReference = faceReference;

@@ -1,4 +1,4 @@
-"""Train and export the small A-E landmark classifier used by SignSpeak."""
+"""Train and export the static hand-shape classifier used by SignSpeak."""
 
 from __future__ import annotations
 
@@ -15,8 +15,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 
 
-def load_dataset(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+def load_dataset(paths: list[Path]) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    rows = []
+    for path in paths:
+        rows.extend(
+            row
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+            if (row := json.loads(line)).get("version", 1) == 1
+        )
     features = np.asarray([row["landmarks"] for row in rows], dtype=np.float64)
     labels = np.asarray([row["label"] for row in rows])
     hands = np.asarray([row["handSide"] for row in rows])
@@ -75,11 +82,11 @@ def export_mlp(model, output: Path, sample_count: int, validation_accuracy: floa
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("dataset", type=Path)
+    parser.add_argument("datasets", type=Path, nargs="+")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    features, labels, hands, timestamps = load_dataset(args.dataset)
+    features, labels, hands, timestamps = load_dataset(args.datasets)
     train_indices, test_indices = chronological_split(labels, hands, timestamps)
     x_train, x_test = features[train_indices], features[test_indices]
     y_train, y_test = labels[train_indices], labels[test_indices]
